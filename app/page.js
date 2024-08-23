@@ -1,9 +1,16 @@
 'use client'
-import { Box, Button, Stack, TextField } from '@mui/material'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
+import { FiSend, FiLoader } from 'react-icons/fi'
+import TypingIndicator from './TypingIndicator'
+
 
 export default function Home() {
+  
+  const [isTyping, setIsTyping] = useState(false)
+
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -12,6 +19,13 @@ export default function Home() {
   ])
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(scrollToBottom, [messages]);
 
   const sendMessage = async () => {
     if (!message.trim() || isLoading) return
@@ -23,7 +37,8 @@ export default function Home() {
       {role: 'user', content: message},
       {role: 'assistant', content: ''},
     ])
-  
+    setIsTyping(true)
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -47,83 +62,108 @@ export default function Home() {
         }
         return newMessages
       })
+      setIsTyping(false)
+
     } catch (error) {
       console.error('Error:', error)
       setMessages((prevMessages) => [
         ...prevMessages,
         {role: 'assistant', content: 'Sorry, there was an error processing your request.'},
       ])
+      setIsTyping(false)
+
     } finally {
       setIsLoading(false)
     }
   }
-
   return (
-    <Box
-      width="100vw"
-      height="100vh"
-      display="flex"
-      flexDirection="column"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Stack
-        direction={'column'}
-        width="500px"
-        height="700px"
-        border="1px solid black"
-        p={2}
-        spacing={3}
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-4xl bg-gray-900 rounded-3xl shadow-2xl overflow-hidden border border-purple-500"
       >
-        <Stack
-          direction={'column'}
-          spacing={2}
-          flexGrow={1}
-          overflow="auto"
-          maxHeight="100%"
-        >
-          {messages.map((message, index) => (
-            <Box
-              key={index}
-              display="flex"
-              justifyContent={
-                message.role === 'assistant' ? 'flex-start' : 'flex-end'
-              }
-            >
-              <Box
-                bgcolor={
-                  message.role === 'assistant'
-                    ? 'primary.main'
-                    : 'secondary.main'
-                }
-                color="white"
-                borderRadius={16}
-                p={3}
-                maxWidth="80%"
+
+        <div className="flex flex-col h-[80vh]">
+          <div className="bg-gray-800 p-4 text-center">
+            <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+              Rate My Professor AI Assistant
+            </h1>
+          </div>
+          <div className="flex-grow overflow-auto p-6 space-y-6 custom-scrollbar">
+            <AnimatePresence>
+              {messages.map((message, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                  className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+                >
+                  <div 
+                    className={`max-w-[80%] p-4 rounded-2xl ${
+                      message.role === 'assistant' 
+                        ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white' 
+                        : 'bg-gradient-to-br from-gray-700 to-gray-800 text-gray-100'
+                    } shadow-lg`}
+                  >
+                    <ReactMarkdown className="prose prose-invert">{message.content}</ReactMarkdown>
+                  </div>
+                
+                </motion.div>
+              ))}
+              {isTyping && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                  className="flex justify-start"
+                >
+                  <TypingIndicator />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="p-6 bg-gray-800">
+            <div className="flex space-x-4">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    sendMessage()
+                  }
+                }}
+                className="flex-grow px-6 py-4 rounded-full bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-300"
+                placeholder="Type your message..."
+              />
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={sendMessage}
+                disabled={isLoading}
+                className={`px-6 py-4 rounded-full text-white font-semibold transition-all duration-300 ${
+                  isLoading
+                    ? 'bg-gray-600 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+                }`}
               >
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              </Box>
-            </Box>
-          ))}
-        </Stack>
-        <Stack direction={'row'} spacing={2}>
-          <TextField
-            label="Message"
-            fullWidth
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage()
-              }
-            }}
-          />
-          <Button variant="contained" onClick={sendMessage} disabled={isLoading}>
-            {isLoading ? 'Sending...' : 'Send'}
-          </Button>
-        </Stack>
-      </Stack>
-    </Box>
+                {isLoading ? (
+                  <FiLoader className="animate-spin" />
+                ) : (
+                  <FiSend />
+                )}
+              </motion.button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   )
 }
